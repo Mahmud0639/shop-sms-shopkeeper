@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shop_sms_shopkeeper/providers/customer_provider.dart';
+import 'package:shop_sms_shopkeeper/providers/sms_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'screens/login_screen.dart';
@@ -17,7 +18,8 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
-        ChangeNotifierProvider(create: (_) => CustomerProvider())
+        ChangeNotifierProvider(create: (_) => CustomerProvider()),
+        ChangeNotifierProvider(create: (_) => SmsProvider())
       ],
       child: MyApp(isLoggedIn: token != null),
     ),

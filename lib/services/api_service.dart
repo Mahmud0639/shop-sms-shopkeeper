@@ -96,4 +96,46 @@ class ApiService {
     );
     return jsonDecode(response.body);
   }
+
+  // ম্যানুয়াল SMS তাগাদা পাঠানোর API Call
+  static Future<Map<String, dynamic>> sendReminderSms(int customerId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/customers/$customerId/send-reminder-sms'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+// ১. SMS শিডিউল তালিকা ও সামারি ডাটা আনা
+  static Future<Map<String, dynamic>> getSmsSchedules({String? status}) async {
+    String url = '$baseUrl/sms/schedules';
+    if (status != null && status != 'all') {
+      url += '?status=$status';
+    }
+    final response = await http.get(
+      Uri.parse(url),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // ২. নতুন SMS শিডিউল তৈরি করা
+  static Future<Map<String, dynamic>> createSmsSchedule(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/sms/schedule'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // ৩. পেন্ডিং শিডিউল বাতিল করা
+  static Future<Map<String, dynamic>> cancelSmsSchedule(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/sms/schedules/$id/cancel'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
 }

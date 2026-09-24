@@ -26,6 +26,89 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             .fetchCustomerDetails(widget.customerId));
   }
 
+  // SMS তাগাদা পাঠানোর কনফার্মেশন ডায়ালগ
+  void _showSmsReminderDialog(BuildContext context, dynamic customer) {
+    final totalDue = customer['total_due'] ?? '0.00';
+    final sampleMessage =
+        "প্রিয় ${customer['name'] ?? ''}, আপনার বর্তমান মোট বাকি ৳$totalDue। দ্রুত পরিশোধ করার অনুরোধ করা হচ্ছে।";
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.sms, color: Color(0xFF1E6B48)),
+            SizedBox(width: 8),
+            Text("SMS তাগাদা পাঠান", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("নিচের মেসেজটি কাস্টমারের মোবাইলে পাঠানো হবে:",
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Text(
+                sampleMessage,
+                style: const TextStyle(fontSize: 13, height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text("* ওয়ালেট থেকে ১টি SMS কাটা হবে।",
+                style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("বাতিল", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E6B48),
+            ),
+            icon: const Icon(Icons.send, size: 16, color: Colors.white),
+            label: const Text("পাঠিয়ে দিন", style: TextStyle(color: Colors.white)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final custProv = Provider.of<CustomerProvider>(context, listen: false);
+              final res = await custProv.sendReminderSms(widget.customerId);
+
+              if (mounted) {
+                if (res['success'] == true) {
+                  // ড্যাশবোর্ডের ওয়ালেট ব্যালেন্স রিফ্রেশ
+                  Provider.of<DashboardProvider>(context, listen: false).fetchDashboard();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res['message'] ?? 'SMS পাঠানো হয়েছে!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res['message'] ?? 'SMS পাঠাতে ব্যর্থ হয়েছে!'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   // বাকি/জমা যোগ করার ডায়ালগ
   void _showTransactionDialog(BuildContext context, String type) {
     final amountController = TextEditingController();
@@ -62,15 +145,61 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               if (amount != null && amount > 0) {
                 Navigator.pop(ctx);
                 final custProv = Provider.of<CustomerProvider>(context, listen: false);
-                final success = await custProv.addTransaction(widget.customerId, type, amount);
 
-                if (success && mounted) {
-                  // ড্যাশবোর্ড ডাটা রিফ্রেশ করা
-                  Provider.of<DashboardProvider>(context, listen: false).fetchDashboard();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(isDue ? "বাকি যোগ করা হয়েছে" : "টাকা জমা নেওয়া হয়েছে")),
-                  );
+
+                // ট্রানজেকশন যোগ করা
+                final bool success = await custProv.addTransaction(widget.customerId, type, amount);
+
+                if (mounted) {
+                  if (success) {
+                    // ১. ড্যাশবোর্ডের SMS ওয়ালেট ও পাওনার হিসেব রিফ্রেশ করা
+                    Provider.of<DashboardProvider>(context, listen: false).fetchDashboard();
+
+                    // ২. কাস্টমারের ডিটেইলস ও লেনদেন রিফ্রেশ করা
+                    custProv.fetchCustomerDetails(widget.customerId);
+
+                    // ৩. নোটিফিকেশন মেসেজ দেখানো
+                    final String snackMessage = isDue
+                        ? "বাকি যোগ করা হয়েছে ও অটো SMS ব্যাকএন্ডে প্রসেস হয়েছে!"
+                        : "টাকা জমা নেওয়া হয়েছে ও অটো SMS ব্যাকএন্ডে প্রসেস হয়েছে!";
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(snackMessage),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
                 }
+                /*// ট্রানজেকশন যোগ করা
+                final response = await custProv.addTransaction(widget.customerId, type, amount);
+
+                if (mounted) {
+                  // ১. ড্যাশবোর্ডের SMS ওয়ালেট ও পাওনার হিসেব রিফ্রেশ করা
+                  Provider.of<DashboardProvider>(context, listen: false).fetchDashboard();
+
+                  // ২. কাস্টমারের ডিটেইলস ও লেনদেন রিফ্রেশ করা
+                  custProv.fetchCustomerDetails(widget.customerId);
+
+                  // ৩. মেসেজ তৈরি করা (SMS গেছে কি না তা উল্লেখ করে)
+                  String snackMessage = isDue ? "বাকি যোগ করা হয়েছে" : "টাকা জমা নেওয়া হয়েছে";
+
+                  // যদি ব্যাকএন্ড রেসপন্সে অটো এসএমএস সাকসেস থাকে
+                  if (response != null &&
+                      response['auto_sms'] is Map &&
+                      response['auto_sms']['sent'] == true) {
+                    snackMessage += " এবং অটো SMS পাঠানো হয়েছে!";
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(snackMessage),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }*/
               }
             },
             child: const Text("সংরক্ষণ করুন", style: TextStyle(color: Colors.white)),
@@ -133,28 +262,51 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           // --- Action Buttons (Due / Collect) ---
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showTransactionDialog(context, 'due'),
-                    icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-                    label: const Text("বাকি দিন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showTransactionDialog(context, 'due'),
+                        icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                        label: const Text("বাকি দিন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showTransactionDialog(context, 'paid'),
+                        icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
+                        label: const Text("জমা নিন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showTransactionDialog(context, 'paid'),
-                    icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
-                    label: const Text("জমা নিন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
+                const SizedBox(height: 10),
+
+                // --- SMS Reminder Button ---
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showSmsReminderDialog(context, customer),
+                    icon: const Icon(Icons.sms_failed_outlined, color: Color(0xFF1E6B48)),
+                    label: const Text(
+                      "SMS তাগাদা পাঠান",
+                      style: TextStyle(color: Color(0xFF1E6B48), fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF1E6B48), width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/dashboard_provider.dart';
 import 'add_customer_screen.dart';
 import 'customer_detail_screen.dart';
+import 'customer_list_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -191,11 +192,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 // --- Customer List Header ---
+                // --- Customer List Header ---
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text("সাম্প্রতিক কাস্টমার", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text("মোট বাকি", style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  children: [
+                    const Text("সাম্প্রতিক কাস্টমার", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    GestureDetector(
+                      onTap: () {
+                        // নেভিগেশন বারের কাস্টমারস ট্যাবে নিয়ে যাবে (ইন্ডেক্স ১)
+                        // যদি MainNavigationScreen দিয়ে কন্ট্রোল করতে চান বা সরাসরি CustomerListScreen-এ নেভিগেট করতে চান
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const CustomerListScreen()),
+                        );
+                      },
+                      child: const Text("সব দেখুন >", style: TextStyle(fontSize: 14, color: Color(0xFF0F4C81), fontWeight: FontWeight.bold)),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),

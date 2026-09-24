@@ -3,6 +3,7 @@ import 'dashboard_screen.dart';
 import 'customer_profile_screen.dart';
 import 'sms_schedule_screen.dart';
 import 'wallet_recharge_screen.dart';
+import 'customer_list_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -17,13 +18,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // ৪টি স্ক্রিনের লিস্ট
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const CustomerProfileScreen(
-      customer: {
-        'name': 'রহিম স্টোর',
-        'phone': '01700000000',
-        'total_due': '১,১০০.০০',
-      },
-    ),
+    const CustomerListScreen(),
     const SmsScheduleScreen(),
     const WalletRechargeScreen(),
   ];
@@ -53,9 +48,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'ড্যাশবোর্ড',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'প্রোফাইল',
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'কাস্টমারস',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.sms_outlined),
