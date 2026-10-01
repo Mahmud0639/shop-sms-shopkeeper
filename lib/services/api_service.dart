@@ -181,4 +181,32 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  // ওয়ালেট ব্যালেন্স ও রিচার্জ ইতিহাস লোড করা
+  static Future<Map<String, dynamic>> getWalletInfo() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/wallet/info'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // অ্যাডমিন প্যানেল থেকে প্যাকেজ লিস্ট লোড করা
+  static Future<Map<String, dynamic>> getSmsPackages() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/wallet/packages'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> getAllRechargeHistory(int page) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/wallet/all-history?page=$page'),
+      headers: await _getHeaders(),
+    );
+
+    return json.decode(response.body);
+  }
+
+
 }
