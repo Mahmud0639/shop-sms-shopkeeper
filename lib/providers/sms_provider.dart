@@ -68,17 +68,17 @@ class SmsProvider with ChangeNotifier {
   }
 
   // শিডিউল ক্যানসেল করা
-  Future<bool> cancelSchedule(int id) async {
+// শিডিউল ক্যানসেল করা
+  Future<Map<String, dynamic>> cancelSchedule(int id, {String currentStatus = 'all'}) async {
     try {
       final res = await ApiService.cancelSmsSchedule(id);
       if (res['success'] == true) {
-        fetchSchedules(); // রিফ্রেশ
-        return true;
+        await fetchSchedules(status: currentStatus); // বর্তমান ফিল্টার অনুযায়ী রিফ্রেশ
       }
-      return false;
+      return res;
     } catch (e) {
       debugPrint('Error cancelling schedule: $e');
-      return false;
+      return {'success': false, 'message': 'বাতিল করতে সমস্যা হয়েছে!'};
     }
   }
 }

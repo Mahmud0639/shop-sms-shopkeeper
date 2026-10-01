@@ -95,4 +95,26 @@ class CustomerProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+Future<Map<String, dynamic>> sendBulkReminderSms({
+  List<int>? customerIds,
+  bool allDueCustomers = false,
+}) async {
+  _isLoading = true;
+  notifyListeners();
+
+  try {
+    final res = await ApiService.sendBulkReminderSms({
+      if (customerIds != null) 'customer_ids': customerIds,
+      'all_due_customers': allDueCustomers,
+    });
+    return res;
+  } catch (e) {
+    return {'success': false, 'message': 'নেটওয়ার্ক এরর!'};
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
 }

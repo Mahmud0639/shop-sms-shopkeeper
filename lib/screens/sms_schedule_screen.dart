@@ -61,6 +61,7 @@ class _SmsScheduleScreenState extends State<SmsScheduleScreen> with SingleTicker
           builder: (context, setModalState) {
             final custProv = Provider.of<CustomerProvider>(context);
             final dashProv = Provider.of<DashboardProvider>(context, listen: false);
+            final smsProv = Provider.of<SmsProvider>(context, listen: false);
 
             return Padding(
               padding: EdgeInsets.only(
@@ -107,7 +108,17 @@ class _SmsScheduleScreenState extends State<SmsScheduleScreen> with SingleTicker
                           isExpanded: true,
                           hint: const Text("কাস্টমার বেছে নিন"),
                           value: selectedCustomerId,
-                          items: custProv.customers.map<DropdownMenuItem<int>>((item) {
+                          items: custProv.customers.where((item) {
+                            // ১. বাকি টাকা ০ এর বেশি হতে হবে
+                            final due = double.tryParse(item['total_due']?.toString() ?? '0') ?? 0;
+
+                            // ২. ইতিমধ্যে পেন্ডিং শিডিউল আছে কিনা তা চেক করা
+                            final hasPendingSchedule = smsProv.schedules.any((s) =>
+                            s['customer_id'] == item['id'] && s['status'] == 'pending'
+                            );
+
+                            return due > 0 && !hasPendingSchedule;
+                          }).map<DropdownMenuItem<int>>((item) {
                             return DropdownMenuItem<int>(
                               value: item['id'],
                               child: Text("${item['name']} (${item['phone']}) - বাকি: ৳${item['total_due'] ?? '0'}"),
@@ -450,7 +461,10 @@ class _SmsScheduleScreenState extends State<SmsScheduleScreen> with SingleTicker
                                       title: const Text("নিশ্চিত করুন"),
                                       content: const Text("আপনি কি এই SMS শিডিউলটি বাতিল করতে চান?"),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("না")),
+                                        TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text("না")
+                                        ),
                                         ElevatedButton(
                                           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                                           onPressed: () => Navigator.pop(ctx, true),
@@ -461,7 +475,18 @@ class _SmsScheduleScreenState extends State<SmsScheduleScreen> with SingleTicker
                                   );
 
                                   if (confirm == true) {
-                                    await Provider.of<SmsProvider>(context, listen: false).cancelSchedule(item['id']);
+                                    final currentStatus = _statusFilters[_tabController.index];
+                                    final result = await Provider.of<SmsProvider>(context, listen: false)
+                                        .cancelSchedule(item['id'], currentStatus: currentStatus);
+
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(result['message'] ?? (result['success'] == true ? 'বাতিল হয়েছে!' : 'বাতিল করা যায়নি!')),
+                                          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+                                        ),
+                                      );
+                                    }
                                   }
                                 },
                               ),

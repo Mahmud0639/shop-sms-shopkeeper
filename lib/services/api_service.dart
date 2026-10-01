@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // আপনার লারাভেল লোকাল IP বা ডোমেইন URL (Android Emulator এর জন্য 10.0.2.2)
-  static const String baseUrl = 'http://10.155.225.203:8000/api';
-
+ // static const String baseUrl = 'http://10.68.144.203:8000/api';
+  static const String baseUrl = 'https://blazing-awhile-childcare.ngrok-free.dev/api';
   // Header এ টোকেন যুক্ত করার মেথড
   static Future<Map<String, String>> _getHeaders() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -130,10 +130,53 @@ class ApiService {
   }
 
   // ৩. পেন্ডিং শিডিউল বাতিল করা
+// ৩. পেন্ডিং শিডিউল বাতিল করা
   static Future<Map<String, dynamic>> cancelSmsSchedule(int id) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/sms/schedules/$id/cancel'),
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/sms/schedules/$id/cancel'),
+        headers: await _getHeaders(),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return data;
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'বাতিল করা সম্ভব হয়নি (Error ${response.statusCode})'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'নেটওয়ার্ক এরর: $e'};
+    }
+  }
+
+  // বাল্ক SMS তাগাদা পাঠানোর API Call (নতুন যুক্ত করা হয়েছে)
+  static Future<Map<String, dynamic>> sendBulkReminderSms(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/customers/send-bulk-reminder-sms'),
       headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // ওয়ালেট রিচার্জ / SSLCommerz পেমেন্ট ইনিশিয়েট করার API Call
+  static Future<Map<String, dynamic>> rechargeWallet({
+    required String packageName,
+    required int smsAmount,
+    required double price,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/wallet/recharge'),
+      headers: await _getHeaders(),
+      body: jsonEncode({
+        'package_name': packageName,
+        'sms_amount': smsAmount,
+        'price': price,
+      }),
     );
     return jsonDecode(response.body);
   }

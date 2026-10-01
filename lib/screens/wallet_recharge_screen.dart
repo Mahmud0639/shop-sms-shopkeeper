@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../services/api_service.dart'; // আপনার API সার্ভিস ইমপোর্ট করুন
 
 class WalletRechargeScreen extends StatefulWidget {
   const WalletRechargeScreen({Key? key}) : super(key: key);
@@ -9,13 +11,68 @@ class WalletRechargeScreen extends StatefulWidget {
 
 class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
   int _selectedPackageIndex = 0;
-  String _selectedPaymentMethod = 'bkash';
+  bool _isLoading = false;
 
   final List<Map<String, dynamic>> _packages = [
-    {'sms': 100, 'price': 50},
-    {'sms': 500, 'price': 220},
-    {'sms': 1000, 'price': 400},
+    {'name': 'Basic', 'sms': 100, 'price': 50.0},
+    {'name': 'Standard', 'sms': 500, 'price': 220.0},
+    {'name': 'Premium', 'sms': 1000, 'price': 400.0},
   ];
+
+  // পেমেন্ট হ্যান্ডলিং মেথড
+  Future<void> _handleRecharge() async {
+    final selectedPkg = _packages[_selectedPackageIndex];
+
+    setState(() => _isLoading = true);
+
+    try {
+      final res = await ApiService.rechargeWallet(
+        packageName: selectedPkg['name'],
+        smsAmount: selectedPkg['sms'],
+        price: selectedPkg['price'],
+      );
+
+      setState(() => _isLoading = false);
+
+      if (res['success'] == true && res['payment_url'] != null) {
+        String paymentUrl = res['payment_url'];
+
+        // WebView স্ক্রিনে নিয়ে যাওয়া
+        if (!mounted) return;
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentWebViewScreen(paymentUrl: paymentUrl),
+          ),
+        );
+
+        // পেমেন্ট ফিল্ডের ফলাফল অনুযায়ী মেসেজ
+        if (result == 'success') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('পেমেন্ট সফল হয়েছে! আপনার ওয়ালেট আপডেট করা হয়েছে।'), backgroundColor: Colors.green),
+          );
+          // TODO: এখানে ড্যাশবোর্ড বা ওয়ালেট ডাটা আবার রিফ্রেশ করতে পারেন
+        } else if (result == 'failed') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('পেমেন্ট ব্যর্থ হয়েছে! আবার চেষ্টা করুন।'), backgroundColor: Colors.red),
+          );
+        } else if (result == 'cancelled') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('পেমেন্ট বাতিল করা হয়েছে।'), backgroundColor: Colors.orange),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message'] ?? 'পেমেন্ট গেটওয়ে ওপেন করা সম্ভব হয়নি!'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('এরর: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,10 +103,7 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
                     children: const [
                       Text("বর্তমান ব্যালেন্স", style: TextStyle(color: Colors.white70, fontSize: 13)),
                       SizedBox(height: 6),
-                      Text(
-                        "৳ ২৫০",
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
+                      Text("৳ ২৫০", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   Column(
@@ -57,10 +111,7 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
                     children: const [
                       Text("অবশিষ্ট SMS", style: TextStyle(color: Colors.white70, fontSize: 13)),
                       SizedBox(height: 6),
-                      Text(
-                        "১০,০০০",
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
+                      Text("১০,০০০", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -100,7 +151,7 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            "${pkg['price']} ৳",
+                            "৳ ${pkg['price'].toInt()}",
                             style: const TextStyle(color: Colors.grey, fontSize: 13),
                           ),
                         ],
@@ -109,22 +160,6 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
                   ),
                 );
               }),
-            ),
-            const SizedBox(height: 20),
-
-            // --- Payment Gateway Selection ---
-            const Text("বিকাশ/নগদ পেমেন্ট গেটওয়ে", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildPaymentCard('bkash', 'বিকাশ', Colors.pink.shade100, Colors.pink),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildPaymentCard('nagad', 'নগদ', Colors.orange.shade100, Colors.orange),
-                ),
-              ],
             ),
             const SizedBox(height: 20),
 
@@ -144,21 +179,25 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
                     children: [
                       const Text("প্যাকেজ মূল্য", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       Text(
-                        "৳ ${_packages[_selectedPackageIndex]['price']}",
+                        "৳ ${_packages[_selectedPackageIndex]['price'].toInt()}",
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                   ElevatedButton(
-                    onPressed: () {
-                      // Trigger Bkash/Nagad Payment Webview
-                    },
+                    onPressed: _isLoading ? null : _handleRecharge,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1E6B48),
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: const Text("রিচার্জ করুন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: _isLoading
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                        : const Text("রিচার্জ করুন", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -172,34 +211,6 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
             _buildHistoryTile("রিচার্জ (৫০০ SMS)", "১১/০২/২০২৬", "৳ ২২০.০০"),
             _buildHistoryTile("রিচার্জ (১০০ SMS)", "০১/০২/২০২৬", "৳ ৫০.০০"),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard(String key, String title, Color bgColor, Color activeColor) {
-    final isSelected = _selectedPaymentMethod == key;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPaymentMethod = key),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? bgColor : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? activeColor : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isSelected ? activeColor : Colors.black,
-            ),
-          ),
         ),
       ),
     );
@@ -230,6 +241,165 @@ class _WalletRechargeScreenState extends State<WalletRechargeScreen> {
             ],
           ),
           Text(amount, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15)),
+        ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// SSLCommerz WebView Controller Screen
+// ==========================================
+/*
+class PaymentWebViewScreen extends StatefulWidget {
+  final String paymentUrl;
+
+  const PaymentWebViewScreen({Key? key, required this.paymentUrl}) : super(key: key);
+
+  @override
+  State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
+}
+
+class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() => _isLoading = true);
+            _checkUrlRedirect(url);
+          },
+          onPageFinished: (String url) {
+            setState(() => _isLoading = false);
+            _checkUrlRedirect(url);
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            _checkUrlRedirect(request.url);
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.paymentUrl));
+  }
+
+  // SSLCommerz রিডাইরেক্ট ইন্টারসেপ্ট মেথড
+  void _checkUrlRedirect(String url) {
+    // শুধুমাত্র নির্দিষ্ট ব্যাকএন্ড রাউটে হিট করলে পপ করবে
+    if (url.contains('/api/payment/success')) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) Navigator.pop(context, 'success');
+      });
+    } else if (url.contains('/api/payment/fail')) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) Navigator.pop(context, 'failed');
+      });
+    } else if (url.contains('/api/payment/cancel')) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) Navigator.pop(context, 'cancelled');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("অনলাইন পেমেন্ট"),
+        backgroundColor: const Color(0xFF1E6B48),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1E6B48)),
+            ),
+        ],
+      ),
+    );
+  }
+}*/
+
+class PaymentWebViewScreen extends StatefulWidget {
+  final String paymentUrl;
+
+  const PaymentWebViewScreen({Key? key, required this.paymentUrl}) : super(key: key);
+
+  @override
+  State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
+}
+
+class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  bool _isHandled = false; // একাধিকবার পপ হওয়া আটকানোর জন্য
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() => _isLoading = true);
+            _checkUrlRedirect(url);
+          },
+          onPageFinished: (String url) {
+            setState(() => _isLoading = false);
+            _checkUrlRedirect(url);
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            _checkUrlRedirect(request.url);
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.paymentUrl));
+  }
+
+  // SSLCommerz রিডাইরেক্ট ইন্টারসেপ্ট মেথড
+  void _checkUrlRedirect(String url) {
+    if (_isHandled) return;
+
+    if (url.contains('/api/payment/success')) {
+      _isHandled = true;
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) Navigator.pop(context, 'success');
+      });
+    } else if (url.contains('/api/payment/fail')) {
+      _isHandled = true;
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) Navigator.pop(context, 'failed');
+      });
+    } else if (url.contains('/api/payment/cancel')) {
+      _isHandled = true;
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) Navigator.pop(context, 'cancelled');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("অনলাইন পেমেন্ট"),
+        backgroundColor: const Color(0xFF1E6B48),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1E6B48)),
+            ),
         ],
       ),
     );

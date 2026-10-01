@@ -12,6 +12,16 @@ class DashboardProvider with ChangeNotifier {
   String get blockReason => _blockReason;
   Map<String, dynamic>? get dashboardData => _dashboardData;
 
+  // 🟢 এসএমএস ব্যালেন্স ৫ বা তার কম কিনা চেক করার হেলপার
+  int get smsBalance {
+    if (_dashboardData != null && _dashboardData!['sms_wallet_balance'] != null) {
+      return int.tryParse(_dashboardData!['sms_wallet_balance'].toString()) ?? 0;
+    }
+    return 0;
+  }
+
+  bool get isLowSmsBalance => smsBalance <= 5;
+
   Future<void> fetchDashboard() async {
     _isLoading = true;
     notifyListeners();

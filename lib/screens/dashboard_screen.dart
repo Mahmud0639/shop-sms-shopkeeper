@@ -4,6 +4,7 @@ import '../providers/dashboard_provider.dart';
 import 'add_customer_screen.dart';
 import 'customer_detail_screen.dart';
 import 'customer_list_screen.dart';
+import 'wallet_recharge_screen.dart'; // ওয়ালেট রিচার্জ স্ক্রিন ইমপোর্ট
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -13,12 +14,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // অ্যাপ চালু হতেই এপিআই থেকে ডাটা লোড হবে
     Future.microtask(() =>
         Provider.of<DashboardProvider>(context, listen: false).fetchDashboard());
   }
@@ -27,7 +26,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboardProv = Provider.of<DashboardProvider>(context);
 
-    // ১. ইউজার ব্লকড হলে এই স্ক্রিন দেখাবে
     if (dashboardProv.isBlocked) {
       return Scaffold(
         body: Center(
@@ -55,7 +53,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    // ২. ডাটা লোডিং স্ট্যাটাস
     if (dashboardProv.isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -64,6 +61,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final data = dashboardProv.dashboardData;
     final recentCustomers = (data?['recent_customers'] as List?) ?? [];
+    final int smsBalance = dashboardProv.smsBalance;
+    final bool isLowBalance = dashboardProv.isLowSmsBalance;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F8),
@@ -76,11 +75,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- SMS Wallet Header Bar ---
+
+                // 🔴 ১. এসএমএস ব্যালেন্স ৫ বা তার কম হলে ওয়ার্নিং অ্যালার্ট ব্যানার
+                if (isLowBalance)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.redAccent.shade100),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            smsBalance == 0
+                                ? "আপনার SMS ব্যালেন্স শেষ! কাস্টমারকে এসএমএস পাঠাতে রিচার্জ করুন।"
+                                : "আপনার SMS ব্যালেন্স কমে $smsBalance টি হয়েছে! দ্রুত রিচার্জ করুন।",
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // --- SMS Wallet Header Bar (ব্যালেন্স অনুযায়ী ডায়নামিক কালার) ---
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E6B48),
+                    // ব্যালেন্স ৫ বা কম হলে লালচে-কমলা কালার, না হলে সবুজ কালার
+                    color: isLowBalance ? const Color(0xFFD9383A) : const Color(0xFF1E6B48),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -89,13 +120,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            "SMS ওয়ালেট",
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                          Row(
+                            children: [
+                              const Text(
+                                "SMS ওয়ালেট",
+                                style: TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                              if (isLowBalance) ...[
+                                const SizedBox(width: 6),
+                                const Icon(Icons.error_outline, color: Colors.yellowAccent, size: 16),
+                              ]
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "${data?['sms_wallet_balance'] ?? 0} SMS অবশিষ্ট",
+                            "$smsBalance SMS অবশিষ্ট",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -106,11 +145,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          // Navigate to Wallet Screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const WalletRechargeScreen()),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF1E6B48),
+                          foregroundColor: isLowBalance ? const Color(0xFFD9383A) : const Color(0xFF1E6B48),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -166,7 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Add New Customer Button (Fixed Position above list) ---
+                // --- Add New Customer Button ---
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -192,15 +234,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 // --- Customer List Header ---
-                // --- Customer List Header ---
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("সাম্প্রতিক কাস্টমার", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     GestureDetector(
                       onTap: () {
-                        // নেভিগেশন বারের কাস্টমারস ট্যাবে নিয়ে যাবে (ইন্ডেক্স ১)
-                        // যদি MainNavigationScreen দিয়ে কন্ট্রোল করতে চান বা সরাসরি CustomerListScreen-এ নেভিগেট করতে চান
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const CustomerListScreen()),
@@ -212,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // --- Recent Customer Items (With ShaderMask Gradient Shadow) ---
+                // --- Recent Customer Items ---
                 if (recentCustomers.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
@@ -222,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   )
                 else
                   SizedBox(
-                    height: 200, // ফিক্সড হাইট (২-৩ টি কার্ড সুন্দর দেখার জন্য)
+                    height: 200,
                     child: ShaderMask(
                       shaderCallback: (Rect bounds) {
                         return const LinearGradient(
@@ -232,9 +271,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Colors.white,
                             Colors.white,
                             Colors.white,
-                            Colors.transparent, // নিচের অংশ আবছা করবে
+                            Colors.transparent,
                           ],
-                          stops: [0.0, 0.6, 0.85, 1.0], // নিচে হালকা শ্যাডো
+                          stops: [0.0, 0.6, 0.85, 1.0],
                         ).createShader(bounds);
                       },
                       blendMode: BlendMode.dstIn,
@@ -245,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         itemBuilder: (context, index) {
                           final item = recentCustomers[index];
                           return _buildCustomerTile(
-                            item['id'], // <-- এখানে id পাঠানো হচ্ছে
+                            item['id'],
                             item['name'] ?? '',
                             "৳ ${item['total_due'] ?? '0'}",
                           );
@@ -261,9 +300,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
-
-  // পরিবর্তন করার স্থান: _buildCustomerTile মেথড
   Widget _buildCustomerTile(int id, String name, String amount) {
     return InkWell(
       onTap: () {
